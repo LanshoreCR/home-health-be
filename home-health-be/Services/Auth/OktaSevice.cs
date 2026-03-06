@@ -1,4 +1,4 @@
-﻿using home_health_be.Config;
+using home_health_be.Config;
 using home_health_be.Models.Auth;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -37,20 +37,10 @@ namespace home_health_be.Services.Auth
             return null;
         }
 
-        Task<string> IOktaService.GetIntrospectionEndpointAsync()
-        {
-            throw new NotImplementedException();
-        }
-
         async Task<OpenIdConnectConfiguration?> IOktaService.GetOpenIdConnectConfigurationAsync()
         {
             var discoveryDocument = await configurationManager.GetConfigurationAsync(CancellationToken.None);
             return discoveryDocument;
-        }
-
-        public Task<string> GetUserInfoEndpointAsync()
-        {
-            throw new NotImplementedException();
         }
     }
 }

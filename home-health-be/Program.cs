@@ -25,122 +25,134 @@ if (builder.Environment.IsDevelopment())
     builder.Configuration.AddUserSecrets<Program>();
 }
 
-#region Okta Configuration
-builder.Services.Configure<OktaConfig>(builder.Configuration.GetSection("Okta"));
-var oktaConfig = builder.Configuration.GetSection("Okta").Get<OktaConfig>();
-var oktaService = new OktaService(oktaConfig);
-var discoveryDocument = await ((IOktaService)oktaService).GetOpenIdConnectConfigurationAsync();
-var introspectionEndpoint = discoveryDocument?.IntrospectionEndpoint;
-var userInfoEndpoint = discoveryDocument?.UserInfoEndpoint;
+#region Authentication & Authorization
+var oktaEnabled = builder.Configuration.GetValue<bool>("Authentication:OktaEnabled");
 
-builder.Services.AddAuthentication(options =>
+if (oktaEnabled)
 {
-    options.DefaultAuthenticateScheme = OAuth2IntrospectionDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = OAuth2IntrospectionDefaults.AuthenticationScheme;
-})
-    .AddOAuth2Introspection(option =>
+    builder.Services.Configure<OktaConfig>(builder.Configuration.GetSection("Okta"));
+    var oktaConfig = builder.Configuration.GetSection("Okta").Get<OktaConfig>();
+    var oktaService = new OktaService(oktaConfig);
+    var discoveryDocument = await ((IOktaService)oktaService).GetOpenIdConnectConfigurationAsync();
+    var introspectionEndpoint = discoveryDocument?.IntrospectionEndpoint;
+    var userInfoEndpoint = discoveryDocument?.UserInfoEndpoint;
+
+    builder.Services.AddAuthentication(options =>
     {
-        option.ClientId = oktaConfig?.ClientId;
-        option.IntrospectionEndpoint = introspectionEndpoint;
-        option.SkipTokensWithDots = false;
-        option.TokenTypeHint = "access_token";
-        option.SaveToken = true;
-
-        option.Events = new OAuth2IntrospectionEvents
-        {
-            OnTokenValidated = async context =>
-            {
-                var accessToken = context.SecurityToken;
-                if (string.IsNullOrEmpty(userInfoEndpoint) || string.IsNullOrEmpty(accessToken))
-                {
-                    context.Fail("Invalid token or user info endpoint.");
-                    return;
-                }
-
-                var userInfo = await ((IOktaService)oktaService).GetUserInfoAsync(userInfoEndpoint, accessToken);
-
-                if (userInfo == null)
-                {
-                    context.Fail("Failed to retrieve user info.");
-                    return;
-                }
-
-                var claims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.Email, userInfo.Email),
-                    new Claim(ClaimTypes.Name, userInfo.Name)
-                };
-
-                // Extract Okta id from email (local-part before '@') and add as claim
-                if (!string.IsNullOrEmpty(userInfo.PreferredName))
-                {
-                    var atIndex = userInfo.PreferredName.IndexOf('@');
-                    if (atIndex > 0)
-                    {
-                        var oktaId = userInfo.PreferredName.Substring(0, atIndex);
-                        claims.Add(new Claim("okta_id", oktaId));
-                    }
-                }
-
-                // Get user roles from MS Graph and add as claims
-                var graphClient = context.HttpContext.RequestServices.GetRequiredService<GraphServiceClient>();
-                var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-                var msGraph = new MSGraph(graphClient, configuration);
-
-                var roles = await msGraph.GetUserRolesAsync(userInfo);
-                foreach (var role in roles)
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
-                }
-
-                var appIdentity = new ClaimsIdentity(claims, context.Scheme.Name);
-                context.Principal = new ClaimsPrincipal(appIdentity);
-                context.Success();
-            }
-        };
+        options.DefaultAuthenticateScheme = OAuth2IntrospectionDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = OAuth2IntrospectionDefaults.AuthenticationScheme;
     })
-    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>("ApiKey", null);
-#endregion
+        .AddOAuth2Introspection(option =>
+        {
+            option.ClientId = oktaConfig?.ClientId;
+            option.IntrospectionEndpoint = introspectionEndpoint;
+            option.SkipTokensWithDots = false;
+            option.TokenTypeHint = "access_token";
+            option.SaveToken = true;
 
-#region Authorization
-builder.Services.AddAuthorization(options =>
+            option.Events = new OAuth2IntrospectionEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var accessToken = context.SecurityToken;
+                    if (string.IsNullOrEmpty(userInfoEndpoint) || string.IsNullOrEmpty(accessToken))
+                    {
+                        context.Fail("Invalid token or user info endpoint.");
+                        return;
+                    }
+
+                    var userInfo = await ((IOktaService)oktaService).GetUserInfoAsync(userInfoEndpoint, accessToken);
+
+                    if (userInfo == null)
+                    {
+                        context.Fail("Failed to retrieve user info.");
+                        return;
+                    }
+
+                    var claims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.Email, userInfo.Email),
+                        new Claim(ClaimTypes.Name, userInfo.Name)
+                    };
+
+                    if (!string.IsNullOrEmpty(userInfo.PreferredName))
+                    {
+                        var atIndex = userInfo.PreferredName.IndexOf('@');
+                        if (atIndex > 0)
+                        {
+                            var oktaId = userInfo.PreferredName.Substring(0, atIndex);
+                            claims.Add(new Claim("okta_id", oktaId));
+                        }
+                    }
+
+                    var graphClient = context.HttpContext.RequestServices.GetRequiredService<GraphServiceClient>();
+                    var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+                    var msGraph = new MSGraph(graphClient, configuration);
+
+                    var roles = await msGraph.GetUserRolesAsync(userInfo);
+                    foreach (var role in roles)
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role));
+                    }
+
+                    var appIdentity = new ClaimsIdentity(claims, context.Scheme.Name);
+                    context.Principal = new ClaimsPrincipal(appIdentity);
+                    context.Success();
+                }
+            };
+        });
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("EDExternalPolicy", policy =>
+        {
+            policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme);
+            policy.RequireAuthenticatedUser();
+        });
+
+        options.AddPolicy("UserPolicy", policy =>
+        {
+            policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme);
+            policy.RequireRole("User", "Leader");
+        });
+
+        options.AddPolicy("ApproverPolicy", policy =>
+        {
+            policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme);
+            policy.RequireRole("Approver", "Leader");
+        });
+
+        options.AddPolicy("ReportPolicy", policy =>
+        {
+            policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme);
+            policy.RequireRole("Report", "Leader");
+        });
+
+        options.AddPolicy("LeaderPolicy", policy =>
+        {
+            policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme);
+            policy.RequireRole("Leader");
+        });
+
+        options.AddPolicy("UserOrApproverPolicy", policy =>
+        {
+            policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme);
+            policy.RequireRole("User", "Approver", "Leader");
+        });
+    });
+}
+else
 {
-    options.AddPolicy("EDExternalPolicy", policy =>
+    builder.Services.AddAuthorization(options =>
     {
-        policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme, "ApiKey");
-        policy.RequireAuthenticatedUser();
+        options.AddPolicy("EDExternalPolicy", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("UserPolicy", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("ApproverPolicy", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("ReportPolicy", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("LeaderPolicy", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("UserOrApproverPolicy", policy => policy.RequireAssertion(_ => true));
     });
-
-    options.AddPolicy("UserPolicy", policy =>
-    {
-        policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme, "ApiKey");
-        policy.RequireRole("User", "Leader");
-    });
-
-    options.AddPolicy("ApproverPolicy", policy =>
-    {
-        policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme, "ApiKey");
-        policy.RequireRole("Approver", "Leader");
-    });
-
-    options.AddPolicy("ReportPolicy", policy =>
-    {
-        policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme, "ApiKey");
-        policy.RequireRole("Report", "Leader");
-    });
-
-    options.AddPolicy("LeaderPolicy", policy =>
-    {
-        policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme, "ApiKey");
-        policy.RequireRole("Leader");
-    });
-
-    options.AddPolicy("UserOrApproverPolicy", policy =>
-    {
-        policy.AddAuthenticationSchemes(OAuth2IntrospectionDefaults.AuthenticationScheme, "ApiKey");
-        policy.RequireRole("User", "Approver", "Leader");
-    });
-});
+}
 #endregion
 
 #region CORS

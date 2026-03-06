@@ -1,0 +1,234 @@
+---
+description: Refactoring principles, code smell prevention, and .NET 9 best practices based on Refactoring Guru
+alwaysApply: true
+---
+
+# Refactoring & Code Smell Prevention — .NET 9
+
+Two guiding laws for every change:
+
+1. **Feynman Law** — If a simpler solution solves the same problem, use the simpler solution.
+2. **Self-Speakable Code** — Code should read like plain English. No comments unless absolutely unavoidable. Use precise variable and method names instead.
+
+---
+
+## Code Smells to Prevent
+
+### Bloaters
+
+- **Long Method** — A method should do one thing. If you need to scroll, extract a method. Prefer ≤ 20 lines.
+- **Large Class** — A class with too many fields, methods, or responsibilities must be split. One class = one reason to change.
+- **Long Parameter List** — More than 3 parameters? Introduce a parameter object or use a record.
+- **Primitive Obsession** — Don't use `string` for emails, `int` for IDs everywhere. Create small value types (`record Email(string Value)`).
+- **Data Clumps** — Groups of data that always travel together belong in their own class or record.
+
+### Object-Orientation Abusers
+
+- **Switch Statements** — Repeated `switch`/`if-else` on a type field? Replace with polymorphism or pattern matching with exhaustive switches.
+- **Temporary Field** — Fields that are only set in certain scenarios are confusing. Move them into the method that needs them, or extract a class.
+- **Refused Bequest** — If a subclass ignores most of its parent, prefer composition over inheritance.
+
+### Change Preventers
+
+- **Divergent Change** — One class changed for many different reasons means it has too many responsibilities. Split it.
+- **Shotgun Surgery** — A single change requires editing many classes? Consolidate related logic into one place.
+
+### Dispensables
+
+- **Duplicate Code** — Extracted shared logic into a well-named private method, base class, or extension method. Never copy-paste.
+- **Dead Code** — Delete unused classes, methods, parameters, and variables. Trust source control.
+- **Speculative Generality** — Don't build abstractions "just in case." Build them when you need them (Rule of Three).
+- **Lazy Class** — A class that does almost nothing should be inlined into its caller.
+- **Comments as Deodorant** — A comment that explains *what* code does means the code is unclear. Rename, extract, simplify until the comment is unnecessary.
+
+### Couplers
+
+- **Feature Envy** — A method that uses another class's data more than its own belongs in that other class.
+- **Inappropriate Intimacy** — Classes that dig into each other's private details should communicate through well-defined interfaces.
+- **Message Chains** — `a.GetB().GetC().GetD()` is fragile. Hide the chain behind a meaningful method.
+- **Middle Man** — A class that only delegates to another class should be removed. Call the real class directly.
+
+---
+
+## Refactoring Techniques to Apply
+
+| Smell | Fix |
+|-------|-----|
+| Long method | Extract Method — pull cohesive lines into a named method |
+| Repeated logic | Extract to private method, extension method, or shared service |
+| Complex conditional | Guard clauses for early returns; decompose into named booleans or methods |
+| Nested if/else | Replace with pattern matching (`switch` expression) or guard clauses |
+| Magic numbers/strings | Replace with `const`, `enum`, or configuration |
+| Long parameter list | Introduce Parameter Object (`record`) |
+| Primitive fields | Replace with value objects (`record EmailAddress(string Value)`) |
+| God class | Extract Class — move cohesive groups of fields + methods into a new class |
+| Inheritance misuse | Replace Inheritance with Delegation (composition) |
+| Null checks everywhere | Use Null Object pattern or nullable reference types with `required` |
+
+---
+
+## .NET 9 Specific Practices
+
+### Use Modern C# Features for Simplicity
+
+```csharp
+// ❌ Verbose
+public class GetUserResponse
+{
+    public string Name { get; set; }
+    public string Email { get; set; }
+}
+
+// ✅ Simple — record does the same with less
+public record GetUserResponse(string Name, string Email);
+```
+
+```csharp
+// ❌ Nested null checks
+if (user != null && user.Address != null && user.Address.City != null)
+
+// ✅ Null-conditional + pattern matching
+if (user?.Address?.City is string city)
+```
+
+```csharp
+// ❌ Traditional switch with fallthrough risk
+switch (status)
+{
+    case "Active": return HandleActive();
+    case "Inactive": return HandleInactive();
+    default: throw new ArgumentException();
+}
+
+// ✅ Switch expression — exhaustive, concise
+return status switch
+{
+    "Active" => HandleActive(),
+    "Inactive" => HandleInactive(),
+    _ => throw new UnreachableException()
+};
+```
+
+### Naming as Documentation
+
+```csharp
+// ❌ Needs a comment to understand
+var d = DateTime.Now - u.CDate; // days since creation
+if (d.TotalDays > 30) { ... }
+
+// ✅ Self-explanatory
+var daysSinceCreation = DateTime.UtcNow - user.CreatedAt;
+if (daysSinceCreation.TotalDays > 30) { ... }
+```
+
+```csharp
+// ❌ Unclear method
+public List<User> Get(bool a, int t) { ... }
+
+// ✅ Name tells the story
+public List<User> GetActiveUsersByOrganization(int organizationId) { ... }
+```
+
+### Service & Controller Practices
+
+```csharp
+// ❌ Fat controller doing business logic
+[HttpPost]
+public async Task<IActionResult> CreateUser(CreateUserRequest request)
+{
+    var existing = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+    if (existing != null) return Conflict();
+    var user = new User { Name = request.Name, Email = request.Email };
+    _db.Users.Add(user);
+    await _db.SaveChangesAsync();
+    return Ok(user);
+}
+
+// ✅ Thin controller, logic in service
+[HttpPost]
+public async Task<IActionResult> CreateUser(CreateUserRequest request)
+{
+    var result = await _userService.CreateUser(request);
+    return result.Match<IActionResult>(
+        success => Ok(success),
+        conflict => Conflict(conflict.Message)
+    );
+}
+```
+
+### Dependency Injection
+
+```csharp
+// ❌ Newing up dependencies
+public class UserService
+{
+    private readonly DatabaseContext _db = new DatabaseContext();
+}
+
+// ✅ Constructor injection
+public class UserService(DatabaseContext db, ILogger<UserService> logger) : IUserService
+{
+    // primary constructor — fields are the parameters themselves
+}
+```
+
+### Guard Clauses over Nesting
+
+```csharp
+// ❌ Deep nesting
+public async Task<User> GetUser(int id)
+{
+    if (id > 0)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user != null)
+        {
+            if (user.IsActive)
+            {
+                return user;
+            }
+        }
+    }
+    return null;
+}
+
+// ✅ Guard clauses — flat, readable
+public async Task<User?> GetActiveUser(int id)
+{
+    if (id <= 0)
+        throw new ArgumentException("Id must be positive", nameof(id));
+
+    var user = await _db.Users.FindAsync(id);
+    if (user is null)
+        return null;
+
+    if (!user.IsActive)
+        return null;
+
+    return user;
+}
+```
+
+---
+
+## When to Refactor
+
+- **Rule of Three** — First time: just do it. Second time: wince but do it. Third time: refactor.
+- **Before adding a feature** — Clean the area you're about to change.
+- **When fixing a bug** — If the code around the bug is messy, clean it first. Bugs hide in messy code.
+- **During code review** — The last chance to catch smells before they reach main.
+
+---
+
+## Checklist Before Every PR
+
+1. No method longer than ~20 lines without good reason
+2. No class doing more than one job
+3. No magic strings or numbers
+4. No copy-pasted logic
+5. No comments that restate what the code does
+6. All names are self-explanatory
+7. No deep nesting (max 2 levels)
+8. No unused code
+9. Guard clauses used instead of nested ifs
+10. Records used for DTOs and value objects
