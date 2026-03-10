@@ -10,4 +10,12 @@ namespace home_health_be.Models.Responses
         OrganizationUnit ExecutiveDirector,
         OrganizationUnit Location
     );
+
+    public record LocationHierarchyRowResponse(
+        OrganizationUnit BusinessLine,
+        OrganizationUnit? Region,
+        OrganizationUnit? RegionalDirector,
+        OrganizationUnit? ExecutiveDirector,
+        OrganizationUnit? Location
+    );
 }
