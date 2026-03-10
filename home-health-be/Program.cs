@@ -173,8 +173,17 @@ builder.Services.AddCors(options =>
 #endregion
 
 #region Database
+var dbHost = builder.Configuration["Database:Host"];
+var dbName = builder.Configuration["Database:Database"];
+var dbUser = builder.Configuration["Database:User"];
+var dbPassword = builder.Configuration["Database:Password"];
+
+var connectionString = !string.IsNullOrEmpty(dbHost)
+    ? $"Server={dbHost};Initial Catalog={dbName};Persist Security Info=False;User ID={dbUser};Password={dbPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+    : builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<DatabaseContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(connectionString));
 #endregion
 
 #region Third-Party Services
@@ -222,8 +231,8 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Version = "v1",
-        Title = "N95 Questionnaire API",
-        Description = "An ASP.NET Core Web API for managing N95 Questionnaire evaluations.",
+        Title = "Home Health API",
+        Description = "An ASP.NET Core Web API for Home Health.",
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

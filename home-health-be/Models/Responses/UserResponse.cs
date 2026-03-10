@@ -1,11 +1,13 @@
-﻿namespace home_health_be.Models.Responses
+namespace home_health_be.Models.Responses
 {
-    public class UserResponse
-    {
-        public string Id { get; set; } = default!;
-        public string Name { get; set; } = default!;
-        public string Email { get; set; } = default!;
-        public List<string> Roles { get; set; } = new();
-        public bool Exists { get; set; }
-    }
+    public record OrganizationUnit(string Id, string Name);
+
+    public record UserResponse(
+        string EmployeeId,
+        OrganizationUnit BusinessLine,
+        OrganizationUnit? Region,
+        OrganizationUnit? RegionalDirector,
+        OrganizationUnit ExecutiveDirector,
+        OrganizationUnit Location
+    );
 }
