@@ -35,8 +35,6 @@ namespace home_health_be.Services
 
         private static LocationHierarchyRowResponse MapToLocationHierarchyRow(LocationFilteringSpResult row)
         {
-            var businessLine = new OrganizationUnit(row.BusinessLine_ID, row.BusinessLine);
-
             OrganizationUnit? region = null;
             if (row.Region_ID is { } regionId && row.RegionName is { } regionName)
                 region = new OrganizationUnit(regionId, regionName);
@@ -53,12 +51,7 @@ namespace home_health_be.Services
             if (row.LocationID is { } locationId && row.LocationName is { } locationName)
                 location = new OrganizationUnit(locationId, locationName);
 
-            return new LocationHierarchyRowResponse(
-                businessLine,
-                region,
-                regionalDirector,
-                executiveDirector,
-                location);
+            return new LocationHierarchyRowResponse(region, regionalDirector, executiveDirector, location);
         }
     }
 }
