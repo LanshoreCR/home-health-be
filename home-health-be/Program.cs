@@ -217,6 +217,8 @@ builder.Services.AddScoped<SharePointAttachments>();
 
 #region Services
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IBannerService, BannerService>();
 
 // Register IHttpContextAccessor to enable access to HttpContext in services
 builder.Services.AddHttpContextAccessor();
