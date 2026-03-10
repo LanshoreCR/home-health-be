@@ -1,5 +1,6 @@
 using home_health_be.Data;
 using home_health_be.Models.Data;
+using home_health_be.Models.Requests;
 using home_health_be.Models.Responses;
 using home_health_be.Services.Interfaces;
 using Microsoft.Data.SqlClient;
@@ -31,6 +32,34 @@ namespace home_health_be.Services
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error executing USP_HH_HomeScreen_Banner");
+                throw;
+            }
+        }
+
+        public async Task<CreateAuditResponse> CreateAuditAsync(CreateAuditRequest request)
+        {
+            try
+            {
+                var edIdParam = new SqlParameter("@EDId", SqlDbType.VarChar, 10) { Value = request.EDId };
+                var createdByParam = new SqlParameter("@CreatedBy", SqlDbType.VarChar, 10) { Value = HardcodedUserId };
+                var startDateParam = new SqlParameter("@StartDate", SqlDbType.Date) { Value = request.StartDate };
+                var endDateParam = new SqlParameter("@EndDate", SqlDbType.Date) { Value = request.EndDate };
+                var packageIdParam = new SqlParameter("@PackageID", SqlDbType.Int) { Direction = ParameterDirection.Output };
+
+                await database.Database.ExecuteSqlRawAsync(
+                    "EXEC [dbo].[USP_HH_Package_Create] @EDId, @CreatedBy, @StartDate, @EndDate, @PackageID OUTPUT",
+                    edIdParam,
+                    createdByParam,
+                    startDateParam,
+                    endDateParam,
+                    packageIdParam);
+
+                var packageId = packageIdParam.Value is int id ? id : 0;
+                return new CreateAuditResponse(packageId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error executing USP_HH_Package_Create");
                 throw;
             }
         }
