@@ -28,4 +28,6 @@ namespace home_health_be.Models.Responses
         int? FolderID,
         string? PackageScore
     );
+
+    public record CreateAuditResponse(int PackageID);
 }
