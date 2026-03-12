@@ -31,6 +31,8 @@ namespace home_health_be.Models.Responses
 
     public record CreateAuditResponse(int PackageID);
 
+    public record CreateToolResponse(int PackageID);
+
     public record AuditByIdResponse(
         int PackageID,
         string PackageName,
