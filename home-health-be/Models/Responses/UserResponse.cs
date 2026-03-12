@@ -30,4 +30,16 @@ namespace home_health_be.Models.Responses
     );
 
     public record CreateAuditResponse(int PackageID);
+
+    public record HomeScreenToolsResponse(
+        string? TemplateName,
+        int TemplateID,
+        int? TemplateStatus,
+        string? TemplateScore,
+        string? AssignedAuditor,
+        int? PackageTemplateID,
+        string? AuditPlaceLocation,
+        string? LocationName,
+        bool? AllQuestionsAnswered
+    );
 }

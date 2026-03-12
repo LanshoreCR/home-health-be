@@ -8,6 +8,7 @@ namespace home_health_be.Services.Interfaces
     {
         Task<IReadOnlyList<AuditResponse>> GetAuditsAsync();
         Task<AuditResponse?> GetAuditByIdAsync(ClaimsPrincipal user, int controller, int packageId);
+        Task<IReadOnlyList<HomeScreenToolsResponse>> GetToolsByPackageIdAsync(int packageId);
         Task<CreateAuditResponse> CreateAuditAsync(CreateAuditRequest request);
     }
 }

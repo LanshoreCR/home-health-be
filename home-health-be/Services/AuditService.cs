@@ -69,6 +69,27 @@ namespace home_health_be.Services
             }
         }
 
+        public async Task<IReadOnlyList<HomeScreenToolsResponse>> GetToolsByPackageIdAsync(int packageId)
+        {
+            try
+            {
+                var packageIdParam = new SqlParameter("@PackageID", SqlDbType.Int) { Value = packageId };
+
+                var rows = await database.Database
+                    .SqlQueryRaw<HomeScreenToolsSpResult>(
+                        "EXEC [dbo].[USP_HH_HomeScreen_Tools] @PackageID",
+                        packageIdParam)
+                    .ToListAsync();
+
+                return rows.Select(MapToHomeScreenToolsResponse).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error executing USP_HH_HomeScreen_Tools");
+                throw;
+            }
+        }
+
         public async Task<CreateAuditResponse> CreateAuditAsync(CreateAuditRequest request)
         {
             try
@@ -110,5 +131,17 @@ namespace home_health_be.Services
                 row.PackageScore
             );
         }
+
+        private static HomeScreenToolsResponse MapToHomeScreenToolsResponse(HomeScreenToolsSpResult row) =>
+            new(
+                row.TemplateName,
+                row.TemplateID,
+                row.TemplateStatus,
+                row.TemplateScore,
+                row.AssignedAuditor,
+                row.PackageTemplateID,
+                row.AuditPlaceLocation,
+                row.LocationName,
+                row.AllQuestionsAnswered);
     }
 }

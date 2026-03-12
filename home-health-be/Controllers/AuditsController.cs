@@ -26,6 +26,21 @@ namespace home_health_be.Controllers
             }
         }
 
+        [HttpGet("{packageId}/tools")]
+        public async Task<ActionResult<IReadOnlyList<HomeScreenToolsResponse>>> GetToolsByPackageId(int packageId)
+        {
+            try
+            {
+                var result = await auditService.GetToolsByPackageIdAsync(packageId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to retrieve tools for package");
+                return StatusCode(500, "An error occurred while retrieving tools.");
+            }
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<AuditResponse>> GetAuditById(int id, [FromQuery] int controller = 1)
         {
