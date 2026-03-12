@@ -26,6 +26,21 @@ namespace home_health_be.Controllers
             }
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<AuditResponse>> GetAuditById(int id, [FromQuery] int controller = 1)
+        {
+            try
+            {
+                var result = await auditService.GetAuditByIdAsync(User, controller, id);
+                return result is null ? NotFound() : Ok(result);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to retrieve audit by id");
+                return StatusCode(500, "An error occurred while retrieving the audit.");
+            }
+        }
+
         [HttpPost]
         public async Task<ActionResult<CreateAuditResponse>> CreateAudit([FromBody] CreateAuditRequest request)
         {
@@ -38,7 +53,7 @@ namespace home_health_be.Controllers
             try
             {
                 var result = await auditService.CreateAuditAsync(request);
-                return CreatedAtAction(nameof(GetAudits), new { id = result.PackageID }, result);
+                return CreatedAtAction(nameof(GetAuditById), new { id = result.PackageID }, result);
             }
             catch (Exception ex)
             {
