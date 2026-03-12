@@ -26,6 +26,27 @@ namespace home_health_be.Controllers
             }
         }
 
+        [HttpPost("tools")]
+        public async Task<ActionResult<CreateToolResponse>> CreateTool([FromBody] CreateToolRequest request)
+        {
+            if (request is null)
+                return BadRequest("Request body is required.");
+
+            if (request.EndDate < request.StartDate)
+                return BadRequest("EndDate must be on or after StartDate.");
+
+            try
+            {
+                var result = await auditService.CreateToolAsync(request);
+                return CreatedAtAction(nameof(GetAuditById), new { id = result.PackageID }, result);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to create tool");
+                return StatusCode(500, "An error occurred while creating the tool.");
+            }
+        }
+
         [HttpGet("{packageId}/tools")]
         public async Task<ActionResult<IReadOnlyList<HomeScreenToolsResponse>>> GetToolsByPackageId(int packageId)
         {

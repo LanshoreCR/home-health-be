@@ -119,6 +119,34 @@ namespace home_health_be.Services
             }
         }
 
+        public async Task<CreateToolResponse> CreateToolAsync(CreateToolRequest request)
+        {
+            try
+            {
+                var edNumberParam = new SqlParameter("@EDNumber", SqlDbType.VarChar, 5) { Value = request.EDNumber };
+                var createdByParam = new SqlParameter("@CreatedBy", SqlDbType.VarChar, 10) { Value = HardcodedUserId };
+                var startDateParam = new SqlParameter("@StartDate", SqlDbType.Date) { Value = request.StartDate };
+                var endDateParam = new SqlParameter("@EndDate", SqlDbType.Date) { Value = request.EndDate };
+                var packageIdParam = new SqlParameter("@PackageID", SqlDbType.Int) { Direction = ParameterDirection.Output };
+
+                await database.Database.ExecuteSqlRawAsync(
+                    "EXEC [dbo].[USP_HH_Package_Create] @EDNumber, @CreatedBy, @StartDate, @EndDate, @PackageID OUTPUT",
+                    edNumberParam,
+                    createdByParam,
+                    startDateParam,
+                    endDateParam,
+                    packageIdParam);
+
+                var packageId = packageIdParam.Value is int id ? id : 0;
+                return new CreateToolResponse(packageId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error executing USP_HH_Package_Create");
+                throw;
+            }
+        }
+
         private static AuditResponse MapToAuditResponse(HomeScreenBannerSpResult row)
         {
             return new AuditResponse(
