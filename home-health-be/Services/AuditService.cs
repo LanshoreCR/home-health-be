@@ -49,13 +49,14 @@ namespace home_health_be.Services
                 var controllerParam = new SqlParameter("@Controller", SqlDbType.Int) { Value = controller };
                 var packageIdParam = new SqlParameter("@PackageID", SqlDbType.Int) { Value = packageId };
 
-                var row = await database.Database
+                var rows = await database.Database
                     .SqlQueryRaw<AuditByIdSpResult>(
                         "EXEC [dbo].[USP_HH_HomeScreen_Banner_Search] @UserID, @Controller, @PackageID",
                         userIdParam,
                         controllerParam,
                         packageIdParam)
-                    .FirstOrDefaultAsync();
+                    .ToListAsync();
+                var row = rows.FirstOrDefault();
 
                 if (row is null)
                     return null;
