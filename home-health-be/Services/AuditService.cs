@@ -37,7 +37,7 @@ namespace home_health_be.Services
             }
         }
 
-        public async Task<AuditResponse?> GetAuditByIdAsync(ClaimsPrincipal user, int controller, int packageId)
+        public async Task<AuditByIdResponse?> GetAuditByIdAsync(ClaimsPrincipal user, int controller, int packageId)
         {
             try
             {
@@ -50,7 +50,7 @@ namespace home_health_be.Services
                 var packageIdParam = new SqlParameter("@PackageID", SqlDbType.Int) { Value = packageId };
 
                 var row = await database.Database
-                    .SqlQueryRaw<HomeScreenBannerSpResult>(
+                    .SqlQueryRaw<AuditByIdSpResult>(
                         "EXEC [dbo].[USP_HH_HomeScreen_Banner_Search] @UserID, @Controller, @PackageID",
                         userIdParam,
                         controllerParam,
@@ -60,7 +60,7 @@ namespace home_health_be.Services
                 if (row is null)
                     return null;
 
-                return MapToAuditResponse(row);
+                return MapToAuditByIdResponse(row);
             }
             catch (Exception ex)
             {
@@ -129,6 +129,29 @@ namespace home_health_be.Services
                 row.EndDate,
                 row.FolderID,
                 row.PackageScore
+            );
+        }
+
+        private static AuditByIdResponse MapToAuditByIdResponse(AuditByIdSpResult row)
+        {
+            OrganizationUnit? regionalDirector = null;
+            if (row.RD_IDa is { } rdId && row.RDName is { } rdName)
+                regionalDirector = new OrganizationUnit(rdId, rdName);
+
+            OrganizationUnit? executiveDirector = null;
+            if (row.ED_ID is { } edId && row.EDName is { } edName)
+                executiveDirector = new OrganizationUnit(edId, edName);
+
+            return new AuditByIdResponse(
+                row.PackageID,
+                row.PackageName,
+                row.PackageStatus,
+                row.StartDate,
+                row.EndDate,
+                row.FolderID,
+                row.PackageScore,
+                regionalDirector,
+                executiveDirector
             );
         }
 

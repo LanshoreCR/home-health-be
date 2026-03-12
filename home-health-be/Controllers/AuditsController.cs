@@ -42,7 +42,7 @@ namespace home_health_be.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<AuditResponse>> GetAuditById(int id, [FromQuery] int controller = 1)
+        public async Task<ActionResult<AuditByIdResponse>> GetAuditById(int id, [FromQuery] int controller = 1)
         {
             try
             {

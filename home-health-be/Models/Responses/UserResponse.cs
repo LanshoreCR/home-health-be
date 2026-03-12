@@ -31,6 +31,18 @@ namespace home_health_be.Models.Responses
 
     public record CreateAuditResponse(int PackageID);
 
+    public record AuditByIdResponse(
+        int PackageID,
+        string PackageName,
+        int PackageStatus,
+        DateTime? StartDate,
+        DateTime? EndDate,
+        int? FolderID,
+        string? PackageScore,
+        OrganizationUnit? RegionalDirector,
+        OrganizationUnit? ExecutiveDirector
+    );
+
     public record HomeScreenToolsResponse(
         string? TemplateName,
         int TemplateID,
